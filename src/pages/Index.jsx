@@ -34,9 +34,11 @@ const Index = () => {
 
   const getCellStyle = (cell) => {
     if (!cell || !cell.s) return {};
-    const { bgColor } = cell.s;
+    const { bgColor, font } = cell.s;
     return {
       backgroundColor: bgColor ? `#${bgColor.rgb.slice(2)}` : "transparent",
+      fontSize: font && font.sz ? `${font.sz}pt` : "inherit",
+      fontWeight: font && font.bold ? "bold" : "normal",
     };
   };
 
