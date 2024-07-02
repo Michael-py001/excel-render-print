@@ -32,7 +32,7 @@ const Index = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl mb-4">Excel File Processor</h1>
+      <h1 className="text-3xl mb-4">Excel Sheet Viewer</h1>
       <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} />
       {sheets.length > 0 && (
         <>
