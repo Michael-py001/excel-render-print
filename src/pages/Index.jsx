@@ -15,10 +15,12 @@ const Index = () => {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: "array" });
       const sheetNames = workbook.SheetNames;
-      const sheetsData = sheetNames.map((name) => ({
-        name,
-        data: XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 }),
-      }));
+      const sheetsData = sheetNames.map((name) => {
+        const sheet = workbook.Sheets[name];
+        const merges = sheet["!merges"] || [];
+        const data = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+        return { name, data, merges, sheet };
+      });
       setSheets(sheetsData);
       setActiveSheet(sheetsData[0]);
     };
@@ -28,6 +30,33 @@ const Index = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const getCellStyle = (cell) => {
+    if (!cell || !cell.s) return {};
+    const { bgColor } = cell.s;
+    return {
+      backgroundColor: bgColor ? `#${bgColor.rgb.slice(2)}` : "transparent",
+    };
+  };
+
+  const renderMergedCells = (sheet) => {
+    const mergedCells = {};
+    sheet.merges.forEach((merge) => {
+      for (let R = merge.s.r; R <= merge.e.r; ++R) {
+        for (let C = merge.s.c; C <= merge.e.c; ++C) {
+          if (R === merge.s.r && C === merge.s.c) {
+            mergedCells[`${R}-${C}`] = {
+              rowspan: merge.e.r - merge.s.r + 1,
+              colspan: merge.e.c - merge.s.c + 1,
+            };
+          } else {
+            mergedCells[`${R}-${C}`] = { hidden: true };
+          }
+        }
+      }
+    });
+    return mergedCells;
   };
 
   return (
@@ -44,25 +73,38 @@ const Index = () => {
                 </TabsTrigger>
               ))}
             </TabsList>
-            {sheets.map((sheet) => (
-              <TabsContent key={sheet.name} value={sheet.name}>
-                <div className="overflow-auto">
-                  <table className="min-w-full bg-white">
-                    <tbody>
-                      {sheet.data.map((row, rowIndex) => (
-                        <tr key={rowIndex}>
-                          {row.map((cell, cellIndex) => (
-                            <td key={cellIndex} className="border px-4 py-2">
-                              {cell}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </TabsContent>
-            ))}
+            {sheets.map((sheet) => {
+              const mergedCells = renderMergedCells(sheet);
+              return (
+                <TabsContent key={sheet.name} value={sheet.name}>
+                  <div className="overflow-auto">
+                    <table className="min-w-full bg-white">
+                      <tbody>
+                        {sheet.data.map((row, rowIndex) => (
+                          <tr key={rowIndex}>
+                            {row.map((cell, cellIndex) => {
+                              const mergeInfo = mergedCells[`${rowIndex}-${cellIndex}`];
+                              if (mergeInfo?.hidden) return null;
+                              return (
+                                <td
+                                  key={cellIndex}
+                                  className="border px-4 py-2"
+                                  rowSpan={mergeInfo?.rowspan || 1}
+                                  colSpan={mergeInfo?.colspan || 1}
+                                  style={getCellStyle(sheet.sheet[XLSX.utils.encode_cell({ r: rowIndex, c: cellIndex })])}
+                                >
+                                  {cell}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TabsContent>
+              );
+            })}
           </Tabs>
           <Button onClick={handlePrint} className="mt-4">
             Print
