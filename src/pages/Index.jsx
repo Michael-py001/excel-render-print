@@ -16,13 +16,17 @@ const Index = () => {
       sheet.eachRow({ includeEmpty: true }, (row, rowIndex) => {
         const rowData = [];
         row.eachCell({ includeEmpty: true }, (cell, colIndex) => {
+          const merges = cell._mergeCount;
           rowData.push({
             value: cell.value,
+            merges: merges,
             style: {
-              backgroundColor: cell.fill?.fgColor?.argb ? `#${cell.fill.fgColor.argb.slice(2)}` : "transparent",
+              backgroundColor: cell.fill?.fgColor?.argb
+                ? `#${cell.fill.fgColor.argb.slice(2)}`
+                : "transparent",
               fontSize: cell.font?.size ? `${cell.font.size}pt` : "inherit",
-              fontWeight: cell.font?.bold ? "bold" : "normal",
-            },
+              fontWeight: cell.font?.bold ? "bold" : "normal"
+            }
           });
         });
         data.push(rowData);
@@ -31,6 +35,38 @@ const Index = () => {
     });
     setSheets(sheetsData);
     setActiveSheet(sheetsData[0]);
+  };
+
+  const renderMergedCells = (sheet) => {
+    const mergedCells = {};
+    const eachRowSet = [];
+    sheet.data.forEach((row, rowIndex) => {
+      eachRowSet.push(row);
+      let startMergeRow = null;
+      let endMergeRow = null;
+      row.forEach((cell, cellIndex) => {
+        if (cell.merges > 0) {
+          startMergeRow = cellIndex;
+          endMergeRow = cellIndex + cell.merges;
+        }
+        if (startMergeRow !== null && endMergeRow !== null) {
+          eachRowSet[rowIndex][cellIndex].colSpan =
+            endMergeRow - startMergeRow + 1;
+          for (let i = startMergeRow + 1; i <= endMergeRow; i++) {
+            eachRowSet[rowIndex][i] = {
+              ...eachRowSet[rowIndex][i],
+              hidden: true
+            };
+          }
+          startMergeRow = null;
+          endMergeRow = null;
+        }
+
+        mergedCells[`${rowIndex}-${cellIndex}`] =
+          eachRowSet[rowIndex][cellIndex];
+      });
+    });
+    return mergedCells;
   };
 
   const handlePrint = () => {
@@ -43,7 +79,12 @@ const Index = () => {
       <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} />
       {sheets.length > 0 && (
         <>
-          <Tabs defaultValue={sheets[0].name} onValueChange={(value) => setActiveSheet(sheets.find(sheet => sheet.name === value))}>
+          <Tabs
+            defaultValue={sheets[0].name}
+            onValueChange={(value) =>
+              setActiveSheet(sheets.find((sheet) => sheet.name === value))
+            }
+          >
             <TabsList>
               {sheets.map((sheet) => (
                 <TabsTrigger key={sheet.name} value={sheet.name}>
@@ -51,29 +92,41 @@ const Index = () => {
                 </TabsTrigger>
               ))}
             </TabsList>
-            {sheets.map((sheet) => (
-              <TabsContent key={sheet.name} value={sheet.name}>
-                <div className="overflow-auto">
-                  <table className="min-w-full bg-white">
-                    <tbody>
-                      {sheet.data.map((row, rowIndex) => (
-                        <tr key={rowIndex}>
-                          {row.map((cell, cellIndex) => (
-                            <td
-                              key={cellIndex}
-                              className="border px-4 py-2"
-                              style={cell.style}
-                            >
-                              {cell.value}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </TabsContent>
-            ))}
+            {sheets.map((sheet) => {
+              const mergedCells = renderMergedCells(sheet);
+              return (
+                <TabsContent key={sheet.name} value={sheet.name}>
+                  <div className="overflow-auto">
+                    <table className="min-w-full bg-white">
+                      <tbody>
+                        {sheet.data.map((row, rowIndex) => (
+                          <tr key={rowIndex}>
+                            {row.map((cell, cellIndex) => {
+                              const row =
+                                mergedCells[`${rowIndex}-${cellIndex}`];
+                              if (row?.hidden) {
+                                return null;
+                              }
+                              return (
+                                <td
+                                  // rowSpan={mergeRowspan || 1}
+                                  colSpan={row.colSpan || 1}
+                                  key={cellIndex}
+                                  className="border px-4 py-2"
+                                  style={cell.style}
+                                >
+                                  {cell.value}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </TabsContent>
+              );
+            })}
           </Tabs>
           <Button onClick={handlePrint} className="mt-4">
             Print
