@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -7,58 +7,34 @@ const Index = () => {
   const [sheets, setSheets] = useState([]);
   const [activeSheet, setActiveSheet] = useState(null);
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const file = event.target.files[0];
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheetNames = workbook.SheetNames;
-      const sheetsData = sheetNames.map((name) => {
-        const sheet = workbook.Sheets[name];
-        const merges = sheet["!merges"] || [];
-        const data = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
-        return { name, data, merges, sheet };
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file);
+    const sheetsData = workbook.worksheets.map((sheet) => {
+      const data = [];
+      sheet.eachRow({ includeEmpty: true }, (row, rowIndex) => {
+        const rowData = [];
+        row.eachCell({ includeEmpty: true }, (cell, colIndex) => {
+          rowData.push({
+            value: cell.value,
+            style: {
+              backgroundColor: cell.fill?.fgColor?.argb ? `#${cell.fill.fgColor.argb.slice(2)}` : "transparent",
+              fontSize: cell.font?.size ? `${cell.font.size}pt` : "inherit",
+              fontWeight: cell.font?.bold ? "bold" : "normal",
+            },
+          });
+        });
+        data.push(rowData);
       });
-      setSheets(sheetsData);
-      setActiveSheet(sheetsData[0]);
-    };
-
-    reader.readAsArrayBuffer(file);
+      return { name: sheet.name, data };
+    });
+    setSheets(sheetsData);
+    setActiveSheet(sheetsData[0]);
   };
 
   const handlePrint = () => {
     window.print();
-  };
-
-  const getCellStyle = (cell) => {
-    if (!cell || !cell.s) return {};
-    const { bgColor, font } = cell.s;
-    return {
-      backgroundColor: bgColor ? `#${bgColor.rgb.slice(2)}` : "transparent",
-      fontSize: font && font.sz ? `${font.sz}pt` : "inherit",
-      fontWeight: font && font.bold ? "bold" : "normal",
-    };
-  };
-
-  const renderMergedCells = (sheet) => {
-    const mergedCells = {};
-    sheet.merges.forEach((merge) => {
-      for (let R = merge.s.r; R <= merge.e.r; ++R) {
-        for (let C = merge.s.c; C <= merge.e.c; ++C) {
-          if (R === merge.s.r && C === merge.s.c) {
-            mergedCells[`${R}-${C}`] = {
-              rowspan: merge.e.r - merge.s.r + 1,
-              colspan: merge.e.c - merge.s.c + 1,
-            };
-          } else {
-            mergedCells[`${R}-${C}`] = { hidden: true };
-          }
-        }
-      }
-    });
-    return mergedCells;
   };
 
   return (
@@ -75,38 +51,29 @@ const Index = () => {
                 </TabsTrigger>
               ))}
             </TabsList>
-            {sheets.map((sheet) => {
-              const mergedCells = renderMergedCells(sheet);
-              return (
-                <TabsContent key={sheet.name} value={sheet.name}>
-                  <div className="overflow-auto">
-                    <table className="min-w-full bg-white">
-                      <tbody>
-                        {sheet.data.map((row, rowIndex) => (
-                          <tr key={rowIndex}>
-                            {row.map((cell, cellIndex) => {
-                              const mergeInfo = mergedCells[`${rowIndex}-${cellIndex}`];
-                              if (mergeInfo?.hidden) return null;
-                              return (
-                                <td
-                                  key={cellIndex}
-                                  className="border px-4 py-2"
-                                  rowSpan={mergeInfo?.rowspan || 1}
-                                  colSpan={mergeInfo?.colspan || 1}
-                                  style={getCellStyle(sheet.sheet[XLSX.utils.encode_cell({ r: rowIndex, c: cellIndex })])}
-                                >
-                                  {cell}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </TabsContent>
-              );
-            })}
+            {sheets.map((sheet) => (
+              <TabsContent key={sheet.name} value={sheet.name}>
+                <div className="overflow-auto">
+                  <table className="min-w-full bg-white">
+                    <tbody>
+                      {sheet.data.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {row.map((cell, cellIndex) => (
+                            <td
+                              key={cellIndex}
+                              className="border px-4 py-2"
+                              style={cell.style}
+                            >
+                              {cell.value}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </TabsContent>
+            ))}
           </Tabs>
           <Button onClick={handlePrint} className="mt-4">
             Print
