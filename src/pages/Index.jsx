@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import ExcelJS from "exceljs";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import "../styles/index.css";
 
 const Index = () => {
   const [sheets, setSheets] = useState([]);
@@ -77,62 +78,64 @@ const Index = () => {
     <div className="container mx-auto p-4">
       <h1 className="text-3xl mb-4">Excel Sheet Viewer</h1>
       <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} />
-      {sheets.length > 0 && (
-        <>
-          <Tabs
-            defaultValue={sheets[0].name}
-            onValueChange={(value) =>
-              setActiveSheet(sheets.find((sheet) => sheet.name === value))
-            }
-          >
-            <TabsList>
-              {sheets.map((sheet) => (
-                <TabsTrigger key={sheet.name} value={sheet.name}>
-                  {sheet.name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {sheets.map((sheet) => {
-              const mergedCells = renderMergedCells(sheet);
-              return (
-                <TabsContent key={sheet.name} value={sheet.name}>
-                  <div className="overflow-auto">
-                    <table className="min-w-full bg-white">
-                      <tbody>
-                        {sheet.data.map((row, rowIndex) => (
-                          <tr key={rowIndex}>
-                            {row.map((cell, cellIndex) => {
-                              const row =
-                                mergedCells[`${rowIndex}-${cellIndex}`];
-                              if (row?.hidden) {
-                                return null;
-                              }
-                              return (
-                                <td
-                                  // rowSpan={mergeRowspan || 1}
-                                  colSpan={row.colSpan || 1}
-                                  key={cellIndex}
-                                  className="border px-4 py-2"
-                                  style={cell.style}
-                                >
-                                  {cell.value}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </TabsContent>
-              );
-            })}
-          </Tabs>
-          <Button onClick={handlePrint} className="mt-4">
-            Print
-          </Button>
-        </>
-      )}
+      <div className="printContent">
+        {sheets.length > 0 && (
+          <>
+            <Tabs
+              defaultValue={sheets[0].name}
+              onValueChange={(value) =>
+                setActiveSheet(sheets.find((sheet) => sheet.name === value))
+              }
+            >
+              <TabsList className="TabsList">
+                {sheets.map((sheet) => (
+                  <TabsTrigger key={sheet.name} value={sheet.name}>
+                    {sheet.name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {sheets.map((sheet) => {
+                const mergedCells = renderMergedCells(sheet);
+                return (
+                  <TabsContent key={sheet.name} value={sheet.name}>
+                    <div className="overflow-auto">
+                      <table className="min-w-full bg-white">
+                        <tbody>
+                          {sheet.data.map((row, rowIndex) => (
+                            <tr key={rowIndex}>
+                              {row.map((cell, cellIndex) => {
+                                const row =
+                                  mergedCells[`${rowIndex}-${cellIndex}`];
+                                if (row?.hidden) {
+                                  return null;
+                                }
+                                return (
+                                  <td
+                                    colSpan={row.colSpan || 1}
+                                    key={cellIndex}
+                                    className="border px-4 py-2 text-center text-nowrap"
+                                    style={cell.style}
+                                  >
+                                    {cell.value}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
+
+            <Button onClick={handlePrint} className="mt-4">
+              Print
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 };
